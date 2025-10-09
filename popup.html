@@ -155,11 +155,19 @@
   </div>
   
   <div class="settings">
-    <label for="apiKey">Groq API Key (FREE & FAST - stored locally):</label>
-    <input type="password" id="apiKey" placeholder="gsk_...">
-    <p style="font-size: 11px; color: #888; margin-top: 5px;">
-      Get free API key at: <a href="https://console.groq.com" target="_blank">console.groq.com</a>
-    </p>
+    <label for="provider">AI Provider (all FREE):</label>
+    <select id="provider" style="width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;">
+      <option value="gemini">Google Gemini (Recommended)</option>
+      <option value="groq">Groq (Fastest)</option>
+      <option value="huggingface">HuggingFace</option>
+    </select>
+    
+    <label for="apiKey">API Key (stored locally):</label>
+    <input type="password" id="apiKey" placeholder="Enter your API key...">
+    
+    <div id="apiLinks" style="font-size: 11px; color: #888; margin-top: 5px;">
+      <p>Get free key at: <a href="https://makersuite.google.com/app/apikey" target="_blank" id="providerLink">makersuite.google.com</a></p>
+    </div>
   </div>
   
   <script src="popup.js"></script>

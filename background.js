@@ -1,13 +1,13 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'analyzeArticle') {
-    analyzeWithAI(request.articleData, request.apiKey)
+    analyzeWithAI(request.articleData, request.apiKey, request.provider)
       .then(analysis => sendResponse({ analysis }))
       .catch(error => sendResponse({ error: error.message }));
     return true; // Keep channel open for async response
   }
 });
 
-async function analyzeWithAI(articleData, apiKey) {
+async function analyzeWithAI(articleData, apiKey, provider = 'gemini') {
   const prompt = `You are a fact-checking and credibility analysis expert. Analyze the following article for credibility, potential misinformation, and bias.
 
 Article Headline: ${articleData.headline}
@@ -37,55 +37,130 @@ Consider:
 Respond ONLY with the JSON, no other text.`;
 
   try {
-    // Using Groq API (FREE & FAST)
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-70b-versatile',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a fact-checking expert who analyzes articles for credibility and misinformation. Always respond with valid JSON.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 1000
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || 'API request failed');
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
+    let response;
     
-    // Parse JSON response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Invalid response format from AI');
+    // Switch between different AI providers
+    switch(provider) {
+      case 'gemini':
+        response = await callGemini(apiKey, prompt);
+        break;
+      case 'groq':
+        response = await callGroq(apiKey, prompt);
+        break;
+      case 'huggingface':
+        response = await callHuggingFace(apiKey, prompt);
+        break;
+      default:
+        throw new Error('Unknown AI provider');
     }
     
-    const analysis = JSON.parse(jsonMatch[0]);
-    
-    // Validate response structure
-    if (!analysis.credibilityScore || !analysis.assessment) {
-      throw new Error('Incomplete analysis from AI');
-    }
-    
-    return analysis;
+    return response;
     
   } catch (error) {
     console.error('API Error:', error);
     throw new Error(`Analysis failed: ${error.message}`);
   }
+}
+
+async function callGemini(apiKey, prompt) {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: prompt
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 1000,
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error?.message || 'Gemini API request failed');
+  }
+
+  const data = await response.json();
+  const content = data.candidates[0].content.parts[0].text;
+  
+  return parseAIResponse(content);
+}
+
+async function callGroq(apiKey, prompt) {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile', // Updated model (Dec 2024)
+      messages: [{
+        role: 'user',
+        content: prompt
+      }],
+      temperature: 0.3,
+      max_tokens: 1000
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error?.message || 'Groq API request failed');
+  }
+
+  const data = await response.json();
+  const content = data.choices[0].message.content;
+  
+  return parseAIResponse(content);
+}
+
+async function callHuggingFace(apiKey, prompt) {
+  const response = await fetch('https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: {
+        temperature: 0.3,
+        max_new_tokens: 1000
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'HuggingFace API request failed');
+  }
+
+  const data = await response.json();
+  const content = data[0].generated_text;
+  
+  return parseAIResponse(content);
+}
+
+function parseAIResponse(content) {
+  // Extract JSON from response
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('Invalid response format from AI');
+  }
+  
+  const analysis = JSON.parse(jsonMatch[0]);
+  
+  // Validate response structure
+  if (!analysis.credibilityScore || !analysis.assessment) {
+    throw new Error('Incomplete analysis from AI');
+  }
+  
+  return analysis;
 }

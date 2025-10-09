@@ -4,13 +4,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   const result = document.getElementById('result');
   const error = document.getElementById('error');
   const apiKeyInput = document.getElementById('apiKey');
+  const providerSelect = document.getElementById('provider');
+  const providerLink = document.getElementById('providerLink');
   
-  // Load saved API key
-  chrome.storage.local.get(['apiKey'], (data) => {
-    if (data.apiKey) {
-      apiKeyInput.value = data.apiKey;
-    }
+  // Provider links
+  const providerLinks = {
+    gemini: 'https://makersuite.google.com/app/apikey',
+    groq: 'https://console.groq.com/keys',
+    huggingface: 'https://huggingface.co/settings/tokens'
+  };
+  
+  // Load saved settings
+  chrome.storage.local.get(['apiKey', 'provider'], (data) => {
+    if (data.apiKey) apiKeyInput.value = data.apiKey;
+    if (data.provider) providerSelect.value = data.provider;
+    updateProviderLink();
   });
+  
+  // Update link when provider changes
+  providerSelect.addEventListener('change', () => {
+    chrome.storage.local.set({ provider: providerSelect.value });
+    updateProviderLink();
+  });
+  
+  function updateProviderLink() {
+    const provider = providerSelect.value;
+    const links = {
+      gemini: { url: providerLinks.gemini, text: 'makersuite.google.com' },
+      groq: { url: providerLinks.groq, text: 'console.groq.com' },
+      huggingface: { url: providerLinks.huggingface, text: 'huggingface.co' }
+    };
+    providerLink.href = links[provider].url;
+    providerLink.textContent = links[provider].text;
+  }
   
   // Save API key on change
   apiKeyInput.addEventListener('change', () => {
@@ -19,9 +45,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   analyzeBtn.addEventListener('click', async () => {
     const apiKey = apiKeyInput.value;
+    const provider = providerSelect.value;
     
     if (!apiKey) {
-      showError('Please enter your OpenAI API key first');
+      showError('Please enter your API key first');
       return;
     }
     
@@ -61,7 +88,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       chrome.runtime.sendMessage({
         action: 'analyzeArticle',
         articleData: articleData,
-        apiKey: apiKey
+        apiKey: apiKey,
+        provider: provider
       }, (response) => {
         if (response.error) {
           showError(response.error);
