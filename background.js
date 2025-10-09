@@ -37,22 +37,27 @@ Consider:
 Respond ONLY with the JSON, no other text.`;
 
   try {
-    // Using Google Gemini API (FREE)
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    // Using Groq API (FREE & FAST)
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1000,
-        }
+        model: 'llama-3.1-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a fact-checking expert who analyzes articles for credibility and misinformation. Always respond with valid JSON.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1000
       })
     });
 
@@ -62,7 +67,7 @@ Respond ONLY with the JSON, no other text.`;
     }
 
     const data = await response.json();
-    const content = data.candidates[0].content.parts[0].text;
+    const content = data.choices[0].message.content;
     
     // Parse JSON response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
