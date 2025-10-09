@@ -37,26 +37,22 @@ Consider:
 Respond ONLY with the JSON, no other text.`;
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Using Google Gemini API (FREE)
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Cheaper and faster than gpt-4
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a fact-checking expert who analyzes articles for credibility and misinformation. Always respond with valid JSON.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 1000
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1000,
+        }
       })
     });
 
@@ -66,7 +62,7 @@ Respond ONLY with the JSON, no other text.`;
     }
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
+    const content = data.candidates[0].content.parts[0].text;
     
     // Parse JSON response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
